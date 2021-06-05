@@ -31,7 +31,7 @@ Parameters:
  * J: output array, coefficient of Ising model
  * h: output array, coefficient of Ising model
 */
-void QUBO2Ising(float xrate[n][n], int J[N][N], float h[N]){
+void QUBO2Ising(float xrate[n][n], int J[N][N], float h[N]) {
     // QUBO formulation
     for (int i = 0; i < n; i++) {
         for (int j = 0; j < n; j++) {
@@ -78,7 +78,7 @@ void SBM(int J[N][N], float h[N], bool spin[N]) {
     for (int step = 0; step < N_step; step++) {
         for (int block=0; block < Pb; block++) {
             int offset = Nb * block; // [Nb * block : Nb * block + Nb]
-            if (step % 2==0) {
+            if (step % 2 == 0) {
                 MMTE(step, J + offset, h + offset, x_a, x_b + offset);
             } else {
                 MMTE(step, J + offset, h + offset, x_b, x_a + offset);
