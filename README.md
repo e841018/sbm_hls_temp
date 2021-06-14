@@ -82,9 +82,9 @@ $$
 \DeclareMathOperator*{\argmin}{argmin}
 Q \in \mathbb{R}^{N\times N}, Q = Q^T, x_i \in \{0, 1\}
 \\
-f_Q(Q, r, x) = \sum_{i=0}^{N-1} \sum_{j=0}^{N-1} Q_{ij} x_i x_j
+f_Q(Q, x) = \sum_{i=0}^{N-1} \sum_{j=0}^{N-1} Q_{ij} x_i x_j
 \\
-x_{opt} = \argmin_x f_Q(Q, r, x)
+x_{opt} = \argmin_x f_Q(Q, x)
 $$
 
 #### Ising model
@@ -105,7 +105,7 @@ $$
 
 & \text{Let } x_i = \frac{s_i + 1}{2}
 \\
-& f_Q(Q, r, x)
+& f_Q(Q, x)
 \\
 & = \sum_{i=0}^{N-1} \sum_{j=0}^{N-1} Q_{ij} x_i x_j
 \\
@@ -132,7 +132,7 @@ $$
 h_i = \left(\sum_{j=0}^{N-1} \frac{Q_{ij}}{4} + \sum_{j=0}^{N-1} \frac{Q_{ji}}{4}\right),
 C = \sum_{i=0}^{N-1} \sum_{j=0}^{N-1} \frac{Q_{ij}}{4}
 \\
-& f_Q(Q, r, x) = -\frac{1}{2}\sum_{i=0}^{N-1} \sum_{j=0}^{N-1} J_{ij} s_i s_j + \sum_{i=0}^{N-1} h_i s_i + C
+& f_Q(Q, x) = -\frac{1}{2}\sum_{i=0}^{N-1} \sum_{j=0}^{N-1} J_{ij} s_i s_j + \sum_{i=0}^{N-1} h_i s_i + C
 = H(J, h, s) + C
 
 \end{align}
