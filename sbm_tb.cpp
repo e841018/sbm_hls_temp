@@ -3,6 +3,8 @@
 #include <iomanip>
 #include <stdlib.h>
 
+const int n_rep = 1;
+
 void rand_init(float arr[N], float low, float high) {
     for (int i = 0; i < N; i++) {
         float r = ((float) rand()) / ((float) RAND_MAX);
@@ -18,6 +20,10 @@ float calc_obj0(float xrate[n][n], bool activation[n][n]) {
     return obj0;
 }
 
+float calc_obj0_3(float xrate[n][n], bool activation[n][n]) {
+    return calc_obj0(xrate, activation) * m_c;
+}
+
 float calc_obj1(bool activation[n][n]) {
     float obj1 = 0;
     for (int i = 0; i < n; i++) {
@@ -26,9 +32,13 @@ float calc_obj1(bool activation[n][n]) {
             temp += activation[i][j];
             temp -= activation[j][i];
         }
-        obj1 -= M1 * temp * temp;
+        obj1 -= temp * temp;
     }
-    return obj1;
+    return M1 * obj1;
+}
+
+float calc_obj1_3(bool activation[n][n]) {
+    return calc_obj1(activation) / M1;
 }
 
 float calc_obj2(bool activation[n][n]) {
@@ -43,6 +53,23 @@ float calc_obj2(bool activation[n][n]) {
     return obj2;
 }
 
+float calc_obj2_3(bool activation[n][n]) {
+    float obj2 = 0;
+    for (int i = 0; i < n; i++)
+        for (int j = 0; j < n; j++)
+            for (int jp = 0; jp < j; jp++)
+                obj2 -= activation[i][j] * activation[i][jp] + activation[j][i] * activation[jp][i];
+    return obj2;
+}
+
+float calc_obj3_3(bool activation[n][n]) {
+    float obj3 = 0;
+    for (int i = 0; i < n; i++)
+        for (int j = 0; j < n; j++)
+            obj3 -= activation[i][j] * activation[j][i];
+    return obj3;
+}
+
 void print_activation(bool activation[n][n]) {
     std::cout << '\n';
     std::cout << "activation =\n";
@@ -55,15 +82,29 @@ void print_activation(bool activation[n][n]) {
 }
 
 void print_objectives(float xrate[n][n], bool activation[n][n]) {
+#ifdef Q2I3
+    float obj0 = calc_obj0_3(xrate, activation);
+    float obj1 = calc_obj1_3(activation);
+    float obj2 = calc_obj2_3(activation);
+    float obj3 = calc_obj3_3(activation);
+    std::cout << '\n';
+    std::cout << "maximize {  obj0  +   obj1  +   obj2  +   obj3 }" << '\n';
+    std::cout << "          " << std::setw(7) << obj0
+                        << " - " << std::setw(7) << (obj1 == 0 ? 0. : - obj1)
+                        << " - " << std::setw(7) << (obj2 == 0 ? 0. : - obj2)
+                        << " - " << std::setw(7) << (obj3 == 0 ? 0. : - obj3)
+                        << " = " << obj0 + obj1 + obj2 << '\n';
+#else
     float obj0 = calc_obj0(xrate, activation);
     float obj1 = calc_obj1(activation);
     float obj2 = calc_obj2(activation);
     std::cout << '\n';
     std::cout << "maximize {  obj0  +   obj1  +   obj2 }" << '\n';
     std::cout << "          " << std::setw(7) << obj0
-                        << " - " << std::setw(7) << - obj1
-                        << " - " << std::setw(7) << - obj2
+                        << " - " << std::setw(7) << (obj1 == 0 ? 0. : - obj1)
+                        << " - " << std::setw(7) << (obj2 == 0 ? 0. : - obj2)
                         << " = " << obj0 + obj1 + obj2 << '\n';
+#endif
 }
 
 bool find_1_on_diagonal(bool activation[n][n]) {
@@ -111,10 +152,10 @@ int main(int argc, char *argv[]) {
     float x_init[N] = {0};
     float p_init[N] = {0};
 
-    for (int rep=0; rep < 1; rep++) {
+    for (int rep=0; rep < n_rep; rep++) {
         // invoke kernel
-        rand_init(x_init, -0.1, 0.1);
-        rand_init(p_init, -0.1, 0.1);
+        rand_init(x_init, -x_init_max, x_init_max);
+        rand_init(p_init, -p_init_max, p_init_max);
         top(xrate, x_init, p_init, activation);
         print_activation(activation);
         print_objectives(xrate, activation);

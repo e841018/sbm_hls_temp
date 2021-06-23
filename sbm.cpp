@@ -88,7 +88,11 @@ void top(float xrate[n][n], float x_init[N], float p_init[N], bool activation[n]
     float h[N] = {0};
     bool spin[N] = {0};
     MMTE blocks[Pb];
+#ifdef Q2I3
+    QUBO2Ising_3(xrate, J, h);
+#else
     QUBO2Ising(xrate, J, h);
+#endif
     float std_of_J  = sd(J);
     float gamma0 = 0.7 * alpha0 / std_of_J / n; // Xi0 in [1]
     float Delta_t_times_gamma0 = Delta_t * gamma0;
@@ -128,6 +132,54 @@ void QUBO2Ising(float xrate[n][n], float J[N][N], float h[N]) {
                 J[ij][ki] -= M1;
                 J[ji][ik] -= M1;
                 J[ji][ki] += M1;
+            }
+        }
+    }
+
+    // convert to Ising model (J -> J and h)
+    for (int i = 0; i < N; i++) {
+        float temp = 0;
+        for (int j = 0; j < N; j++) {
+            temp += J[i][j] + J[j][i];
+        }
+        h[i] = temp / 4;
+    }
+    for (int i = 0; i < N; i++) {
+        for (int j = 0; j < N; j++) {
+            J[i][j] /= -2;
+        }
+    }
+
+#ifdef DEBUG_PRINT
+    print_J(J);
+    print_h(h);
+#endif
+}
+
+/*
+Convert the QUBO formulation into an Ising model, with object function from [3]
+
+Parameters:
+ * xrate: input array, log2(exchange rate)
+ * J: output array, coefficient of (s_i * s_j) in Ising model
+ * h: output array, coefficient of s_i in Ising model
+*/
+void QUBO2Ising_3(float xrate[n][n], float J[N][N], float h[N]) {
+    // QUBO formulation
+    for (int i = 0; i < n; i++) {
+        for (int j = 0; j < n; j++) {
+            int ij = i * n + j;
+            int ji = j * n + i;
+            J[ij][ij] -= xrate[i][j] * m_c + 0.5;
+            J[ji][ji] -= 0.5;
+            J[ij][ji] += 1;
+            for (int k = 0; k < n; k++) {
+                int ik = i * n + k;
+                int ki = k * n + i;
+                J[ij][ik] += 1 + 0.5;
+                J[ij][ki] -= 1;
+                J[ji][ik] -= 1;
+                J[ji][ki] += 1 + 0.5;
             }
         }
     }
@@ -206,31 +258,33 @@ void SBM(MMTE blocks[Pb], bool spin[N]) {
     log_file.open("log.txt");
 #else
     std::cout << '\n';
-    std::cout << "t=0 (init):\n";
 #endif
-    for (int b=0; b < Pb; b++)
-        print_x_p(blocks[b].x_sub, blocks[b].p_sub);
 #endif
 
     for (int t = 0; t < N_step; t++) {
 
 #ifdef DEBUG_PRINT
 #ifndef LOG_X_P
-        std::cout << "t=" << t+1 << ":\n";
+        std::cout << "t=" << t << ":\n";
 #endif
 #endif
 
         for (int b=0; b < Pb; b++) {
             int offset = Nb * b; // [Nb * b : Nb * b + Nb]
             if (t % 2 == 0) {
-                blocks[b].step(x_a, x_b + offset);
+                blocks[b].step(t, x_a, x_b + offset);
             } else {
-                blocks[b].step(x_b, x_a + offset);
+                blocks[b].step(t, x_b, x_a + offset);
             }
         }
     }
 
 #ifdef DEBUG_PRINT
+#ifndef LOG_X_P
+    std::cout << "t="<< N_step <<" (final):\n";
+#endif
+    for (int b=0; b < Pb; b++)
+        print_x_p(blocks[b].x_sub, blocks[b].p_sub);
 #ifdef LOG_X_P
     log_file.close();
 #endif
@@ -267,11 +321,18 @@ void MMTE::init(float J_sub[Nb][N], float h_sub[Nb], float x_sub_init[Nb], float
 Simulate a time step
 
 Parameters:
+ * t: input scalar, time step
  * x_prime_in: input array, x_prime from all blocks, passed to MM
  * x_prime_out: output array, x_prime of this block
 */
-void MMTE::step(float x_prime_in[N], float x_prime_out[Nb]) {
+void MMTE::step(int t, float x_prime_in[N], float x_prime_out[Nb]) {
     float Delta_P[Nb] = {0};
+
+#ifdef DEBUG_PRINT
+    print_x_p(x_sub, p_sub);
+#endif
+
+    update_alpha_eta(t);
 
     MM(x_prime_in, Delta_P);
 
@@ -284,13 +345,21 @@ void MMTE::step(float x_prime_in[N], float x_prime_out[Nb]) {
     for (int i = 0; i < Nb; i++) {
         x_prime_out[i] = x_sub[i] * Delta_t_times_gamma0;
     }
+}
 
-    alpha += Delta_alpha;
+/*
+update time-dependent functions alpha(t) and eta(t)
+
+Parameters:
+ * t: input scalar
+*/
+void MMTE::update_alpha_eta(int t) {
+    const float alpha_beg = 0.;
+    const float alpha_end = 1.;
+    // alpha(t) is p(t) in [1], changes linearly from 0 to 1
+    alpha = (alpha_end - alpha_beg) * ((float) t / N_step) + alpha_beg;
+    // eta(t) is stated to be dependent on alpha(t) in [2], but not presents in [1]
     eta = alpha * 0.7 * alpha0 / n;
-
-#ifdef DEBUG_PRINT
-    print_x_p(x_sub, p_sub);
-#endif
 }
 
 /*
