@@ -83,11 +83,29 @@ Parameters:
  * p_init: input array, used to initialize p[N]
  * activation: output array, activation of links in xrate
 */
-void top(float xrate[n][n], float x_init[N], float p_init[N], bool activation[n][n]) {
+void top(orderBookResponse_t update, orderEntryOperation_t operations[N], float x_init[N], float p_init[N]) {
+#pragma HLS INTERFACE m_axi port=operations offset=slave bundle=gmem0
+#pragma HLS INTERFACE m_axi port=x_init offset=slave bundle=gmem1
+#pragma HLS INTERFACE m_axi port=p_init offset=slave bundle=gmem0
+
+#pragma HLS INTERFACE s_axilite port=update
+#pragma HLS INTERFACE s_axilite port=operations
+#pragma HLS INTERFACE s_axilite port=x_init
+#pragma HLS INTERFACE s_axilite port=p_init
+
+    static float xrate[n][n];
     float J[N][N] = {0};
     float h[N] = {0};
     bool spin[N] = {0};
     MMTE blocks[Pb];
+
+    // update xrate
+    xrate[update.symbolRow][update.symbolRow] = update.askPrice;
+    static int update_count = 0;
+    update_count++;
+    if (update_count < 9) // TODO
+        return;
+
 #ifdef Q2I3
     QUBO2Ising_3(xrate, J, h);
 #else
@@ -103,11 +121,21 @@ void top(float xrate[n][n], float x_init[N], float p_init[N], bool activation[n]
     SBM(blocks, spin);
 
     // reshape
+    int count = 0;
     for (int i = 0; i < n; i++) {
         for (int j = 0; j < n; j++) {
-            activation[i][j] = spin[i * n + j];
+            if (spin[i * n + j]) {
+                orderEntryOperation_t operation = operations[count];
+                operation.timestamp = 0; // TODO
+                operation.symbolRow = i;
+                operation.symbolCol = j;
+                count++;
+            }
         }
     }
+    // mark end
+    orderEntryOperation_t operation = operations[count];
+    operation.timestamp = (uint64_t)(-1);
 }
 
 /*

@@ -1,6 +1,17 @@
 #ifndef __SBM_H__
 #define __SBM_H__
 
+#include "mm_datatype.h"
+
+// #ifdef HLS_STREAM
+//     #include <hls_stream.h>
+//     typedef hls::stream<orderEntryOperation_t> opStream
+// #else
+//     #include <ostream>
+//     typedef std::ostream opStream
+// #endif
+
+
 // switch between QUBO2Ising and QUBO2Ising_3
 #define Q2I3
 
@@ -54,7 +65,8 @@ public:
     inline float FP(float p_sub_i);
 };
 
-void top(float xrate[n][n], float x_init[N], float p_init[N], bool activation[n][n]);
+void top(orderBookResponse_t update, orderEntryOperation_t operations[N], float x_init[N], float p_init[N]);
+// void top(float xrate[n][n], float x_init[N], float p_init[N], bool activation[n][n]);
 void QUBO2Ising(float xrate[n][n], float J[N][N], float h[N]);
 void QUBO2Ising_3(float xrate[n][n], float J[N][N], float h[N]);
 float sd(float J[N][N]);

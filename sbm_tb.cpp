@@ -3,8 +3,6 @@
 #include <iomanip>
 #include <stdlib.h>
 
-const int n_rep = 1;
-
 void rand_init(float arr[N], float low, float high) {
     for (int i = 0; i < N; i++) {
         float r = ((float) rand()) / ((float) RAND_MAX);
@@ -148,15 +146,36 @@ int main(int argc, char *argv[]) {
         {-0.042122476, -0.1619456788, 0},
     };
 
-    bool activation[n][n] = {0};
+    const int n_seq = N;
+    orderBookResponse_t *updates[n_seq];
+    for (int i = 0; i < n; i++) {
+        for (int j = 0; j < n; j++) {
+            orderBookResponse_t *update = new orderBookResponse_t;
+            update->symbolRow = i;
+            update->symbolCol = j;
+            update->askPrice = xrate[i][j];
+            updates[i * n + j] = update;
+        }
+    }
+    orderEntryOperation_t operations[N];
+    
     float x_init[N] = {0};
     float p_init[N] = {0};
 
-    for (int rep=0; rep < n_rep; rep++) {
+    for (int rep=0; rep < n_seq; rep++) {
         // invoke kernel
         rand_init(x_init, -x_init_max, x_init_max);
         rand_init(p_init, -p_init_max, p_init_max);
-        top(xrate, x_init, p_init, activation);
+        top(*updates[rep], operations, x_init, p_init);
+        bool activation[n][n] = {0};
+        for (int c = 0; c < N; c++) {
+            orderEntryOperation_t op = operations[c];
+            if (op.timestamp == (uint64_t)(-1))
+                break;
+            uint64_t t = op.timestamp;
+            activation[op.symbolRow][op.symbolCol] = true;
+        }
+
         print_activation(activation);
         print_objectives(xrate, activation);
         // brute_force(xrate);
