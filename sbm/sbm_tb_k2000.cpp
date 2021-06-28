@@ -7,7 +7,6 @@
 #include <stdlib.h>
 
 const int n_rep = 1;
-const int n = 10;
 
 void rand_init(float arr[N], float low, float high) {
     for (int i = 0; i < N; i++) {
@@ -67,7 +66,7 @@ int main(int argc, char *argv[]) {
         rand_init(p_init, -p_init_max, p_init_max);
         
         bool spin[N] = {0};
-        top(J, h, x_init, p_init, spin);
+        bottom(J, h, x_init, p_init, spin);
         int cut, cost = 0;
         #ifdef K2000
         evalCost(J, h, spin, cut, cost);

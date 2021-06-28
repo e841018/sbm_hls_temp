@@ -40,9 +40,9 @@ typedef struct orderBookResponse_t
 
 typedef struct orderEntryOperation_t
 {
-	unsigned int timestamp;
-	unsigned int symbolRow;
-	unsigned int symbolCol;
+    unsigned int timestamp;
+    unsigned int symbolRow;
+    unsigned int symbolCol;
 } orderEntryOperation_t;
 
 #endif

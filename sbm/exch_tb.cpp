@@ -3,6 +3,8 @@
 #include <iomanip>
 #include <stdlib.h>
 
+const int n_seq = N;    // number of xrate updates
+
 float xrate[n][n] = {
    {0, -0.1203764797, 0.04217729502},
    {0.1203365239, 0, 0.1620771323},
@@ -186,7 +188,7 @@ int main(int argc, char *argv[]) {
         rand_init(p_init, -p_init_max, p_init_max);
 
         // invoke kernel
-        exch(*updates[seq], operations, x_init, p_init);
+        exch(updates[seq], operations, x_init, p_init);
 
         // skip the first n_seq - 1 runs
         if (seq < n_seq - 1)
