@@ -52,6 +52,9 @@ public:
 
 void top(float J[N][N], float h[N], float x_init[N], float p_init[N], bool spin[N]);
 float sd(float J[N][N]);
-void SBM(MMTE blocks[Pb], bool spin[N]);
+void SBM(float J[N][N], float h[N], MMTE blocks[Pb], bool spin[N]);
+#ifdef K2000
+void evalCost(float J[N][N], float h[N], bool spin[N], int& cut, int& cost);
+#endif // K2000
 
 #endif

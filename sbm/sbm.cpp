@@ -3,6 +3,9 @@
 
 #define DEBUG_PRINT
 #define LOG_X_P
+//#define K2000
+
+#define CUR_EXCH
 
 #ifdef DEBUG_PRINT
 #include <iostream>
@@ -95,7 +98,7 @@ void top(float J[N][N], float h[N], float x_init[N], float p_init[N], bool spin[
         int offset = Nb * b; // [Nb * b : Nb * b + Nb]
         blocks[b].init(J + offset, h + offset, x_init + offset, p_init + offset, Delta_t_times_gamma0);
     }
-    SBM(blocks, spin);
+    SBM(J, h, blocks, spin);
 }
 
 
@@ -144,7 +147,7 @@ Parameters:
  * blocks: object array, elements are initialized MMTE modules
  * spin: output array, true: s_i=1, false: s_i=-1
 */
-void SBM(MMTE blocks[Pb], bool spin[N]) {
+void SBM(float J[N][N], float h[N], MMTE blocks[Pb], bool spin[N]) {
     float x_a[N] = {0}; // double buffer
     float x_b[N] = {0}; // double buffer
 
@@ -154,6 +157,14 @@ void SBM(MMTE blocks[Pb], bool spin[N]) {
 #else
     std::cout << '\n';
 #endif
+#endif
+
+#ifdef K2000
+    int cut = 0;
+    int cost = 0;
+    int bestCut = -1000;
+    int bestCost = -1000;
+    bool bestSpin[N] = {0};
 #endif
 
     for (int t = 0; t < N_step; t++) {
@@ -172,7 +183,30 @@ void SBM(MMTE blocks[Pb], bool spin[N]) {
                 blocks[b].step(t, x_b, x_a + offset);
             }
         }
+        for (int i = 0; i < N; i++)
+            spin[i] = x_a[i] > 0; // spin = sign(x)
+
+        #ifdef K2000
+        evalCost(J, h, spin, cut, cost);
+        if (cut > bestCut) {
+            bestCut = cut;
+            bestCost = cost;
+            for (int i = 0; i < N; ++i) {
+                bestSpin[i] = spin[i];
+            }
+        }
+        #endif
     }
+
+    #ifdef K2000
+    std::cout << "Best cut = " << bestCut << std::endl;
+    std::cout << "Best cost = " << bestCost << std::endl;
+    std::cout << "Best spin = ";
+    for (int i = 0; i < N; ++i) {
+        std::cout << bestSpin[i];
+    }
+    std::cout << std::endl;
+    #endif
 
 #ifdef DEBUG_PRINT
 #ifndef LOG_X_P
@@ -184,11 +218,31 @@ void SBM(MMTE blocks[Pb], bool spin[N]) {
     log_file.close();
 #endif
 #endif
-    
-    for (int i = 0; i < N; i++)
-        spin[i] = x_a[i] > 0; // spin = sign(x)
 }
 
+#ifdef K2000
+void evalCost(float J[N][N], float h[N], bool spin[N], int& cut, int& cost) {
+    cost = 0;
+    cut = 0;
+    for (int j=1; j<N; ++j) {
+        for (int i=0; i<j; ++i) {
+            cost -= J[i][j] * (2*spin[i]-1) * (2*spin[j]-1);
+            //cost -= J[i][j] * (spin[i] * spin[j]);
+            if (spin[i] != spin[j]) {
+                //std::cout << i << " " << j << " " << J[i][j] << std::endl;
+                cut += J[i][j];
+            }
+        }
+    }
+    //std::cout << "spin = ";
+    //for (int i=0; i<N; ++i) {
+    //    std::cout << spin[i];
+    //}
+    //std::cout << "\n";
+    //std::cout << "cut = " << cut << std::endl;
+    //std::cout << "cost = " << cost << std::endl;
+}
+#endif // K2000
 
 /*
 Initialize a MMTE block (Nb spins)

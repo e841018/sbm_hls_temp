@@ -27,28 +27,6 @@ void print_activation(bool activation[n][n]) {
     }
 }
 
-void evalCost(float J[N][N], float h[N], bool spin[N]) {
-    int cost = 0;
-    int cut = 0;
-    for (int j=1; j<N; ++j) {
-        for (int i=0; i<j; ++i) {
-            cost -= J[i][j] * (2*spin[i]-1) * (2*spin[j]-1);
-            //cost -= J[i][j] * (spin[i] * spin[j]);
-            if (spin[i] != spin[j]) {
-                //std::cout << i << " " << j << " " << J[i][j] << std::endl;
-                cut += J[i][j];
-            }
-        }
-    }
-    std::cout << "spin = ";
-    for (int i=0; i<N; ++i) {
-        std::cout << spin[i];
-    }
-    std::cout << "\n";
-    std::cout << "cut = " << cut << std::endl;
-    std::cout << "cost = " << cost << std::endl;
-}
-
 int main(int argc, char *argv[]) {
     if (argc < 2)
     {
@@ -90,7 +68,12 @@ int main(int argc, char *argv[]) {
         
         bool spin[N] = {0};
         top(J, h, x_init, p_init, spin);
-        evalCost(J, h, spin);
+        int cut, cost = 0;
+        #ifdef K2000
+        evalCost(J, h, spin, cut, cost);
+        #endif
+        std::cout << "cut = " << cut << std::endl;
+        std::cout << "cost = " << cost << std::endl;
         // reshape
         //
         //for (int i = 0; i < n; i++) {
