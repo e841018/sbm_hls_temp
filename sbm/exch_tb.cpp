@@ -1,10 +1,29 @@
-#include "sbm.h"
+#include "exch.h"
 #include <iostream>
 #include <iomanip>
 #include <stdlib.h>
 
-const int n_rep = 1;
-const int n = 5;
+// float xrate[n][n] = {
+//    {0, -0.1203764797, 0.04217729502},
+//    {0.1203365239, 0, 0.1620771323},
+//    {-0.042122476, -0.1619456788, 0},
+// };
+
+// float xrate[N] = {
+//     0,	-0.1203764797,	0.04217729502,	-2.017242085,	-0.8277471774,
+//     0.1203365239,	0,	0.1620771323,	-1.897297122,	-0.7078485463,
+//     -0.042122476,	-0.1619456788,	0.	-2.059374059,	-0.869869781,
+//     2.017276612,	1.897566294,	2.059483515,	0,	1.189565844,
+//     0.8278643034,	0.7080542498,	0.8700524427,	-1.189490314,	0
+// };
+
+float xrate[n][n] = {
+    {0,	-0.1203764797,	0.04217729502,	-2.017242085,	-0.8277471774},
+    {0.1203365239,	0,	0.1620771323,	-1.897297122,	-0.7078485463},
+    {-0.042122476,	-0.1619456788,	0.,	-2.059374059,	-0.869869781},
+    {2.017276612,	1.897566294,	2.059483515,	0,	1.189565844},
+    {0.8278643034,	0.7080542498,	0.8700524427,	-1.189490314,	0}
+};
 
 void rand_init(float arr[N], float low, float high) {
     for (int i = 0; i < N; i++) {
@@ -12,7 +31,6 @@ void rand_init(float arr[N], float low, float high) {
         arr[i] = low + r * (high - low);
     }
 }
-
 
 float calc_obj0(float xrate[n][n], bool activation[n][n]) {
     float obj0 = 0;
@@ -141,155 +159,52 @@ void brute_force(float xrate[n][n]) {
     }
 }
 
-
-/*
-Convert the QUBO formulation into an Ising model
-
-Parameters:
- * xrate: input array, log2(exchange rate)
- * J: output array, coefficient of (s_i * s_j) in Ising model
- * h: output array, coefficient of s_i in Ising model
-*/
-void QUBO2Ising(float xrate[n][n], float J[N][N], float h[N]) {
-    // QUBO formulation
-    for (int i = 0; i < n; i++) {
-        for (int j = 0; j < n; j++) {
-            int ij = i * n + j;
-            int ji = j * n + i;
-            J[ij][ij] -= xrate[i][j] + M2;
-            for (int k = 0; k < n; k++) {
-                int ik = i * n + k;
-                int ki = k * n + i;
-                J[ij][ik] += M1 + M2;
-                J[ij][ki] -= M1;
-                J[ji][ik] -= M1;
-                J[ji][ki] += M1;
-            }
-        }
-    }
-
-    // convert to Ising model (J -> J and h)
-    for (int i = 0; i < N; i++) {
-        float temp = 0;
-        for (int j = 0; j < N; j++) {
-            temp += J[i][j] + J[j][i];
-        }
-        h[i] = temp / 4;
-    }
-    for (int i = 0; i < N; i++) {
-        for (int j = 0; j < N; j++) {
-            J[i][j] /= -2;
-        }
-    }
-
-#ifdef DEBUG_PRINT
-    print_J(J);
-    print_h(h);
-#endif
-}
-
-/*
-Convert the QUBO formulation into an Ising model, with object function from [3]
-
-Parameters:
- * xrate: input array, log2(exchange rate)
- * J: output array, coefficient of (s_i * s_j) in Ising model
- * h: output array, coefficient of s_i in Ising model
-*/
-void QUBO2Ising_3(float xrate[n][n], float J[N][N], float h[N]) {
-    // QUBO formulation
-    for (int i = 0; i < n; i++) {
-        for (int j = 0; j < n; j++) {
-            int ij = i * n + j;
-            int ji = j * n + i;
-            J[ij][ij] -= xrate[i][j] * m_c + 0.5;
-            J[ji][ji] -= 0.5;
-            J[ij][ji] += 1;
-            for (int k = 0; k < n; k++) {
-                int ik = i * n + k;
-                int ki = k * n + i;
-                J[ij][ik] += 1 + 0.5;
-                J[ij][ki] -= 1;
-                J[ji][ik] -= 1;
-                J[ji][ki] += 1 + 0.5;
-            }
-        }
-    }
-
-    // convert to Ising model (J -> J and h)
-    for (int i = 0; i < N; i++) {
-        float temp = 0;
-        for (int j = 0; j < N; j++) {
-            temp += J[i][j] + J[j][i];
-        }
-        h[i] = temp / 4;
-    }
-    for (int i = 0; i < N; i++) {
-        for (int j = 0; j < N; j++) {
-            J[i][j] /= -2;
-        }
-    }
-
-#ifdef DEBUG_PRINT
-    print_J(J);
-    print_h(h);
-#endif
-}
-
 int main(int argc, char *argv[]) {
     std::cout << std::fixed << std::setprecision(4);
 
-    //float xrate[n][n] = {
-    //    {0, -0.1203764797, 0.04217729502},
-    //    {0.1203365239, 0, 0.1620771323},
-    //    {-0.042122476, -0.1619456788, 0},
-    //};
-    /*
-    float xrate[N] = {
-        0,	-0.1203764797,	0.04217729502,	-2.017242085,	-0.8277471774,
-        0.1203365239,	0,	0.1620771323,	-1.897297122,	-0.7078485463,
-        -0.042122476,	-0.1619456788,	0.	-2.059374059,	-0.869869781,
-        2.017276612,	1.897566294,	2.059483515,	0,	1.189565844,
-        0.8278643034,	0.7080542498,	0.8700524427,	-1.189490314,	0
-    };
-    */
-    float xrate[n][n] = {
-        {0,	-0.1203764797,	0.04217729502,	-2.017242085,	-0.8277471774},
-        {0.1203365239,	0,	0.1620771323,	-1.897297122,	-0.7078485463},
-        {-0.042122476,	-0.1619456788,	0.,	-2.059374059,	-0.869869781},
-        {2.017276612,	1.897566294,	2.059483515,	0,	1.189565844},
-        {0.8278643034,	0.7080542498,	0.8700524427,	-1.189490314,	0}
-    };
-    float J[N][N] = {0};
-    float h[N] = {0};
-    
-    #define Q2I3
-    #ifdef Q2I3
-        QUBO2Ising_3(xrate, J, h);
-    #else
-        QUBO2Ising(xrate, J, h);
-    #endif
+    // fill updates
+    orderBookResponse_t *updates[n_seq];
+    for (int i = 0; i < n; i++) {
+        for (int j = 0; j < n; j++) {
+            orderBookResponse_t *update = new orderBookResponse_t;
+            update->symbolRow = i;
+            update->symbolCol = j;
+            update->askPrice = xrate[i][j];
+            updates[i * n + j] = update;
+        }
+    }
 
-    bool activation[n][n] = {0};
+    // initialize arrays
+    orderEntryOperation_t operations[max_op];
     float x_init[N] = {0};
-    float p_init[N] = {0};    
+    float p_init[N] = {0};
 
-    for (int rep=0; rep < n_rep; rep++) {
-        // invoke kernel
+    for (int seq = 0; seq < n_seq; seq++) {
+        
+        // fill init values
         rand_init(x_init, -x_init_max, x_init_max);
         rand_init(p_init, -p_init_max, p_init_max);
-        
-        bool spin[N] = {0};
-        top(J, h, x_init, p_init, spin);
-        // reshape
-        for (int i = 0; i < n; i++) {
-            for (int j = 0; j < n; j++) {
-                activation[i][j] = spin[i * n + j];
-            }
+
+        // invoke kernel
+        exch(*updates[seq], operations, x_init, p_init);
+
+        // skip the first n_seq - 1 runs
+        if (seq < n_seq - 1)
+            continue;
+
+        // reconstruct activation matrix
+        bool activation[n][n] = {0};
+        for (int c = 0; c < max_op; c++) {
+            orderEntryOperation_t op = operations[c];
+            if (op.timestamp == (uint64_t)(-1))
+                break;
+            uint64_t t = op.timestamp;
+            activation[op.symbolRow][op.symbolCol] = true;
         }
+        
         print_activation(activation);
         print_objectives(xrate, activation);
-        brute_force(xrate);
+        // brute_force(xrate); // only for testing small datasets
     }
 
     return 0;
