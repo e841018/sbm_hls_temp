@@ -1,12 +1,12 @@
 #ifndef __SBM_H__
 #define __SBM_H__
 
-#define K2000
+//#define K2000
 // #define CUR_EXCH
 
 // problem size
-const int N = 10; // number of variables
-const int N_step = 4000; // number of steps
+const int N = 9; // number of variables
+const int N_step = 2; // number of steps
 const int M = 2; // number of substeps in a step
 
 // degree of parallelism

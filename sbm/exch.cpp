@@ -1,13 +1,12 @@
 #include "exch.h"
 #include "mm_datatype.h"
-#include <limits>
 
 /*
 Top-level function to export
 
 Parameters:
 */
-void exch(orderBookResponse_t update, orderEntryOperation_t operations[N], float x_init[N], float p_init[N]) {
+void exch(orderBookResponse_t update, orderEntryOperation_t operations[max_op], float x_init[N], float p_init[N]) {
 #pragma HLS INTERFACE m_axi port=operations offset=slave bundle=gmem0
 #pragma HLS INTERFACE m_axi port=x_init offset=slave bundle=gmem1
 #pragma HLS INTERFACE m_axi port=p_init offset=slave bundle=gmem0
@@ -18,10 +17,10 @@ void exch(orderBookResponse_t update, orderEntryOperation_t operations[N], float
 #pragma HLS INTERFACE s_axilite port=p_init
 
     // static matrix keeping track of exchange rate
-    static float xrate[n][n];
+    static float xrate[n][n] = {0};
 
     // update xrate
-    xrate[update.symbolRow][update.symbolRow] = update.askPrice;
+    xrate[update.symbolRow][update.symbolCol] = update.askPrice;
 
     // skip first n_seq - 1 runs
     static int update_count = 0;
@@ -43,18 +42,18 @@ void exch(orderBookResponse_t update, orderEntryOperation_t operations[N], float
     for (int i = 0; i < n; i++) {
         for (int j = 0; j < n; j++) {
             if (spin[i * n + j]) {
-                orderEntryOperation_t operation = operations[count];
-                operation.timestamp = 0; // TODO
-                operation.symbolRow = i;
-                operation.symbolCol = j;
+                orderEntryOperation_t *operation = &operations[count];
+                operation->timestamp = 0; // TODO
+                operation->symbolRow = i;
+                operation->symbolCol = j;
                 count++;
             }
         }
     }
 
     // mark end
-    orderEntryOperation_t operation = operations[count];
-    operation.timestamp = (uint64_t)(-1);
+    if (count < max_op)
+        operations[count].timestamp = (unsigned int)(-1);
 }
 
 /*
@@ -88,7 +87,6 @@ void QUBO2Ising(float xrate[n][n], float J[N][N], float h[N]) {
         }
     }
 #else
-    // QUBO formulation
     for (int i = 0; i < n; i++) {
         for (int j = 0; j < n; j++) {
             int ij = i * n + j;

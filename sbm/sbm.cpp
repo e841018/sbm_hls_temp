@@ -1,7 +1,7 @@
 #include "sbm.h"
 #include <math.h> // sqrt
 
-#define DEBUG_PRINT
+// #define DEBUG_PRINT
 #define LOG_X_P
 
 #ifdef DEBUG_PRINT
