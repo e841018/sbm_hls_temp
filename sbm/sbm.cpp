@@ -3,9 +3,6 @@
 
 #define DEBUG_PRINT
 #define LOG_X_P
-//#define K2000
-
-#define CUR_EXCH
 
 #ifdef DEBUG_PRINT
 #include <iostream>
@@ -226,7 +223,7 @@ void evalCost(float J[N][N], float h[N], bool spin[N], int& cut, int& cost) {
     cut = 0;
     for (int j=1; j<N; ++j) {
         for (int i=0; i<j; ++i) {
-            cost -= J[i][j] * (2*spin[i]-1) * (2*spin[j]-1);
+            cost += J[i][j] * (2*spin[i]-1) * (2*spin[j]-1);
             //cost -= J[i][j] * (spin[i] * spin[j]);
             if (spin[i] != spin[j]) {
                 //std::cout << i << " " << j << " " << J[i][j] << std::endl;

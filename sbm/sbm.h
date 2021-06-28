@@ -1,9 +1,12 @@
 #ifndef __SBM_H__
 #define __SBM_H__
 
+#define K2000
+// #define CUR_EXCH
+
 // problem size
-const int N = 1000; // number of variables
-const int N_step = 10; // number of steps
+const int N = 10; // number of variables
+const int N_step = 4000; // number of steps
 const int M = 2; // number of substeps in a step
 
 // degree of parallelism
@@ -20,7 +23,7 @@ QUBO2Ising_3 is based on the objective function in [3].
 */
 const float alpha0 = 1.; // Delta in [1]
 const float beta0 = 1.; // K in [1]
-const float Delta_t = 0.9;
+const float Delta_t = 0.7;
 const float delta_t = Delta_t / M;
 
 // constants in objective function
@@ -29,7 +32,7 @@ const float M2 = 0.2;
 const float m_c = 1100; // [3]
 
 // initialization
-const float x_init_max = 0.1;
+const float x_init_max = 0.001;
 const float p_init_max = x_init_max;
 
 class MMTE {
@@ -56,5 +59,7 @@ void SBM(float J[N][N], float h[N], MMTE blocks[Pb], bool spin[N]);
 #ifdef K2000
 void evalCost(float J[N][N], float h[N], bool spin[N], int& cut, int& cost);
 #endif // K2000
+#ifdef CUR_EXCH
+#endif // CUR_EXCH
 
 #endif

@@ -48,12 +48,12 @@ int main(int argc, char *argv[]) {
     int bufferInt1, bufferInt2, bufferInt3;
     ifs >> numvar >> numline;
     //assert(bufferInt1 == N);
-    int size = 100 * 99 / 2;
     for (int i=0; i<numline; ++i) {
         ifs >> bufferInt1 >> bufferInt2 >> bufferInt3;
         //std::cerr << bufferInt1 << " " << bufferInt2 << " " << bufferInt3 << std::endl;
-        if (bufferInt2 < 101) {
+        if (bufferInt2 < N+1) {
             J[bufferInt1-1][bufferInt2-1] -= bufferInt3;
+            J[bufferInt2-1][bufferInt1-1] -= bufferInt3;
         }
     }
 
