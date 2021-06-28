@@ -3,6 +3,8 @@
 #include <iostream>
 #include "xcl2.hpp"
 #include <iomanip>
+#include <vector>
+#include "mm_datatype.h"
 
 // problem size
 const int n = 3;       // number of currencies
@@ -22,7 +24,7 @@ The corresponding components in [1] are annotated in comments.
 */
 const float alpha0 = 1.; // Delta in [1]
 const float beta0 = 1.;  // K in [1]
-const float Delta_t = 0.9;
+const float Delta_t = 0.7;
 const float delta_t = Delta_t / M;
 const float alpha_init = 0.; // p(t) in [1], changes linearly from 0 to 1
 const float Delta_alpha = (1. - alpha_init) / N_step;
@@ -34,7 +36,7 @@ static const std::string error_message =
     "Error: Result mismatch:\n"
     "i = %d CPU result = %d Device result = %d\n";
 
-void rand_init(float arr[N], float low, float high)
+void rand_init(std::vector<float, aligned_allocator<float>> &arr, float low, float high)
 {
     for (int i = 0; i < N; i++)
     {
@@ -165,9 +167,11 @@ int main(int argc, char *argv[])
 
     // Compute the size of array in bytes
     //size_t size_in_bytes = DATA_SIZE * sizeof(int);
-    size_t xrate_size_bytes = n * n * sizeof(float);
+
+    //size_t xrate_size_bytes = n * n * sizeof(float);
     size_t xpinit_size_bytes = n * sizeof(float);
-    size_t activatetion_size_bytes = n * n * sizeof(bool);
+    //size_t activatetion_size_bytes = n * n * sizeof(bool);
+    size_t orderEntryOperation_t_size_bytes = N * sizeof(orderEntryOperation_t);
 
     // Creates a vector of DATA_SIZE elements with an initial value of 10 and 32
     // using customized allocator for getting buffer alignment to 4k boundary
@@ -224,30 +228,38 @@ int main(int argc, char *argv[])
 
     // This call will get the kernel object from program. A kernel is an
     // OpenCL function that is executed on the FPGA.
-    cl::Kernel krnl_sbm(program, "top");
+    cl::Kernel krnl_sbm(program, "exch");
 
     float xrate[n][n] = {
         {0, -0.1203764797, 0.04217729502},
         {0.1203365239, 0, 0.1620771323},
         {-0.042122476, -0.1619456788, 0},
     };
-    bool activation[n][n] = {0};
-    float x_init[N] = {0};
-    float p_init[N] = {0};
+    //orderEntryOperation_t Operations[n];
+    std::vector<orderEntryOperation_t, aligned_allocator<orderEntryOperation_t>> Operations(n);
+    std::vector<float, aligned_allocator<float>> x_init(N);
+    std::vector<float, aligned_allocator<float>> p_init(N);
+    orderBookResponse_t *current_order;
+    current_order = new orderBookResponse_t;
+    //float x_init[N] = {0};
+    //float p_init[N] = {0};
 
     // These commands will allocate memory on the Device. The cl::Buffer objects can
     // be used to reference the memory locations on the device.
-    cl::Buffer buffer_xrate(context, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR, xrate_size_bytes, xrate);
-    cl::Buffer buffer_xinit(context, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR, xpinit_size_bytes, x_init);
-    cl::Buffer buffer_pinit(context, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR, xpinit_size_bytes, p_init);
-    cl::Buffer buffer_activation(context, CL_MEM_WRITE_ONLY | CL_MEM_USE_HOST_PTR, activatetion_size_bytes, activation);
+    //cl::Buffer buffer_xrate(context, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR, xrate_size_bytes, xrate);
+    cl::Buffer buffer_order(context, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR, sizeof(orderBookResponse_t), current_order);
+    cl::Buffer buffer_xinit(context, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR, xpinit_size_bytes, x_init.data());
+    cl::Buffer buffer_pinit(context, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR, xpinit_size_bytes, p_init.data());
+    cl::Buffer buffer_orderEntryOperation(context, CL_MEM_WRITE_ONLY | CL_MEM_USE_HOST_PTR, orderEntryOperation_t_size_bytes, Operations.data());
 
     //set the kernel Arguments
     int narg = 0;
-    krnl_sbm.setArg(narg++, buffer_xrate);
+    //krnl_sbm.setArg(narg++, buffer_xrate);
+
+    krnl_sbm.setArg(narg++, buffer_order);
+    krnl_sbm.setArg(narg++, buffer_orderEntryOperation);
     krnl_sbm.setArg(narg++, buffer_xinit);
     krnl_sbm.setArg(narg++, buffer_pinit);
-    krnl_sbm.setArg(narg++, buffer_activation);
 
     // //We then need to map our OpenCL buffers to get the pointers
     // float **ptr_xrate = (float **)q.enqueueMapBuffer(buffer_xrate, CL_TRUE, CL_MAP_WRITE, 0, xrate_size_bytes);
@@ -255,29 +267,58 @@ int main(int argc, char *argv[])
     // float *ptr_pinit = (float *)q.enqueueMapBuffer(buffer_pinit, CL_TRUE, CL_MAP_WRITE, 0, xpinit_size_bytes);
     // bool **ptr_activation = (bool **)q.enqueueMapBuffer(buffer_activation, CL_TRUE, CL_MAP_READ, 0, activatetion_size_bytes);
 
-
     //set the random seed to zero to reproduce same result every time;
     srand(0);
     std::cout << std::fixed << std::setprecision(4);
 
-    for (int rep = 0; rep < 1; rep++)
+    for (unsigned int i = 0; i < n * n; i++)
     {
         // invoke kernel
+        if (xrate[i / n][i % n] == 0.)
+        {
+            continue;
+        }
         rand_init(x_init, -0.1, 0.1);
         rand_init(p_init, -0.1, 0.1);
+        current_order->symbolRow = i / n;
+        current_order->symbolCol = i % n;
+        current_order->askPrice = xrate[i / n][i % n];
+        //std::cout << current_order->symbolRow << " " << current_order->symbolCol << " " << current_order->askPrice << std::endl;
+
         // Data will be migrated to kernel space
-        q.enqueueMigrateMemObjects({buffer_xrate, buffer_xinit, buffer_pinit}, 0 /* 0 means from host*/);
+        q.enqueueMigrateMemObjects({buffer_xinit, buffer_pinit, buffer_order}, 0 /* 0 means from host*/);
         //Launch the Kernel
         q.enqueueTask(krnl_sbm);
         brute_force(xrate);
         // The result of the previous kernel execution will need to be retrieved in
         // order to view the results. This call will transfer the data from FPGA to
         // source_results vector
-        q.enqueueMigrateMemObjects({buffer_activation}, CL_MIGRATE_MEM_OBJECT_HOST);
+        q.enqueueMigrateMemObjects({buffer_orderEntryOperation}, CL_MIGRATE_MEM_OBJECT_HOST);
         q.finish();
+        for (int j = 0; j < N; j++)
+        {
+            if (Operations[j].timestamp == (uint)(-1))
+            {
+                if (j == 0)
+                {
+                    std::cout << "No solution" << std::endl;
+                }
+                break;
+            }
+            std::cout << "buy index (row,col) = (" << Operations[j].symbolRow << ", " << Operations[j].symbolCol << ")" << std::endl
+                      << std::endl;
+        }
+        bool activation[n][n] = {0};
+        for (int c = 0; c < N; c++)
+        {
+            if (Operations[c].timestamp == (unsigned int)(-1))
+                break;
+            //uint64_t t = Operations[c].timestamp;
+            activation[Operations[c].symbolRow][Operations[c].symbolCol] = true;
+        }
+
         print_activation(activation);
         print_objectives(xrate, activation);
-        // brute_force(xrate);
     }
 
     //Verify the result

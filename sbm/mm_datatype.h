@@ -30,20 +30,19 @@
 //     ap_uint<8> direction;
 // } orderEntryOperation_t;
 
-#include <cstdint>
 
 typedef struct orderBookResponse_t
 {
-    uint8_t symbolRow;
-    uint8_t symbolCol;
-    uint32_t askPrice;
+    unsigned int symbolRow;
+    unsigned int symbolCol;
+    float askPrice;
 } orderBookResponse_t;
 
 typedef struct orderEntryOperation_t
 {
-    uint64_t timestamp;
-    uint8_t symbolRow;
-    uint8_t symbolCol;
+    unsigned int timestamp;
+    unsigned int symbolRow;
+    unsigned int symbolCol;
 } orderEntryOperation_t;
 
 #endif

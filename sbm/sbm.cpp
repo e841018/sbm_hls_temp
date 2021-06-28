@@ -86,7 +86,7 @@ Parameters:
  * p_init: input array, used to initialize p[N]
  * activation: output array, activation of links in xrate
 */
-void top(float J[N][N], float h[N], float x_init[N], float p_init[N], bool spin[N]) {
+void bottom(float J[N][N], float h[N], float x_init[N], float p_init[N], bool spin[N]) {
     MMTE blocks[Pb];
     float std_of_J  = sd(J);
     float gamma0 = 0.7 * alpha0 / std_of_J / sqrt(N); // Xi0 in [1]
@@ -127,7 +127,7 @@ float sd(float J[N][N]) {
     var /= (N * N);
 
     float std = sqrt(var);
-    
+
 #ifdef DEBUG_PRINT
     std::cout << '\n';
     std::cout << "sd(J) = " << std << '\n';
