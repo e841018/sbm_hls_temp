@@ -120,7 +120,7 @@ bool find_1_on_diagonal(bool activation[n][n])
     return false;
 }
 
-void brute_force(float xrate[n][n])
+inline void brute_force(float xrate[n][n])
 {
     int n_config = 1 << N;
     bool activation[n][n];
@@ -228,7 +228,9 @@ int main(int argc, char *argv[])
 
     // This call will get the kernel object from program. A kernel is an
     // OpenCL function that is executed on the FPGA.
-    cl::Kernel krnl_sbm(program, "exch");
+    cl::Kernel krnl_exch_in(program, "exch_in");
+    cl::Kernel krnl_sbm(program, "top");
+    cl::Kernel krnl_exch_out(program, "exch_out");
 
     float xrate[n][n] = {
         {0, -0.1203764797, 0.04217729502},
@@ -239,27 +241,32 @@ int main(int argc, char *argv[])
     std::vector<orderEntryOperation_t, aligned_allocator<orderEntryOperation_t>> Operations(n);
     std::vector<float, aligned_allocator<float>> x_init(N);
     std::vector<float, aligned_allocator<float>> p_init(N);
-    orderBookResponse_t *current_order;
-    current_order = new orderBookResponse_t;
+    orderBookResponse_t *current_order = (orderBookResponse_t*)(new char[4096]);
     //float x_init[N] = {0};
     //float p_init[N] = {0};
 
     // These commands will allocate memory on the Device. The cl::Buffer objects can
     // be used to reference the memory locations on the device.
     //cl::Buffer buffer_xrate(context, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR, xrate_size_bytes, xrate);
-    cl::Buffer buffer_order(context, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR, sizeof(orderBookResponse_t), current_order);
+    cl::Buffer buffer_order(context, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR, sizeof(char)*4096 /*4k aligned*/, current_order);
     cl::Buffer buffer_xinit(context, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR, xpinit_size_bytes, x_init.data());
     cl::Buffer buffer_pinit(context, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR, xpinit_size_bytes, p_init.data());
     cl::Buffer buffer_orderEntryOperation(context, CL_MEM_WRITE_ONLY | CL_MEM_USE_HOST_PTR, orderEntryOperation_t_size_bytes, Operations.data());
+    cl::Buffer buffer_J(context, CL_MEM_READ_WRITE | CL_MEM_HOST_NO_ACCESS, N*N*sizeof(float ), nullptr);
+    cl::Buffer buffer_h(context, CL_MEM_READ_WRITE | CL_MEM_HOST_NO_ACCESS, N*sizeof(float ), nullptr);
+    cl::Buffer buffer_spin(context, CL_MEM_READ_WRITE | CL_MEM_HOST_NO_ACCESS, N*N*sizeof(bool ), nullptr);
 
     //set the kernel Arguments
-    int narg = 0;
-    //krnl_sbm.setArg(narg++, buffer_xrate);
-
-    krnl_sbm.setArg(narg++, buffer_order);
-    krnl_sbm.setArg(narg++, buffer_orderEntryOperation);
-    krnl_sbm.setArg(narg++, buffer_xinit);
-    krnl_sbm.setArg(narg++, buffer_pinit);
+    krnl_exch_in.setArg(0,buffer_order);
+    krnl_exch_in.setArg(1,buffer_J);
+    krnl_exch_in.setArg(2,buffer_h);
+    krnl_sbm.setArg(0, buffer_J);
+    krnl_sbm.setArg(1, buffer_h);
+    krnl_sbm.setArg(2, buffer_xinit);
+    krnl_sbm.setArg(3, buffer_pinit);
+    krnl_sbm.setArg(4, buffer_spin);
+    krnl_exch_out.setArg(0,buffer_spin);
+    krnl_exch_out.setArg(1,buffer_orderEntryOperation);
 
     // //We then need to map our OpenCL buffers to get the pointers
     // float **ptr_xrate = (float **)q.enqueueMapBuffer(buffer_xrate, CL_TRUE, CL_MAP_WRITE, 0, xrate_size_bytes);
@@ -286,15 +293,19 @@ int main(int argc, char *argv[])
         //std::cout << current_order->symbolRow << " " << current_order->symbolCol << " " << current_order->askPrice << std::endl;
 
         // Data will be migrated to kernel space
-        q.enqueueMigrateMemObjects({buffer_xinit, buffer_pinit, buffer_order}, 0 /* 0 means from host*/);
+        //q.enqueueMigrateMemObjects({buffer_xinit, buffer_pinit, buffer_order}, 0 /* 0 means from host*/);
+        q.enqueueMigrateMemObjects({buffer_xinit, buffer_pinit,buffer_order}, 0 /* 0 means from host*/);
         //Launch the Kernel
+        q.enqueueTask(krnl_exch_in);
         q.enqueueTask(krnl_sbm);
-        brute_force(xrate);
+        q.enqueueTask(krnl_exch_out);
+
         // The result of the previous kernel execution will need to be retrieved in
         // order to view the results. This call will transfer the data from FPGA to
         // source_results vector
         q.enqueueMigrateMemObjects({buffer_orderEntryOperation}, CL_MIGRATE_MEM_OBJECT_HOST);
         q.finish();
+        brute_force(xrate);
         for (int j = 0; j < N; j++)
         {
             if (Operations[j].timestamp == (uint)(-1))
@@ -305,20 +316,21 @@ int main(int argc, char *argv[])
                 }
                 break;
             }
-            std::cout << "buy index (row,col) = (" << Operations[j].symbolRow << ", " << Operations[j].symbolCol << ")" << std::endl
-                      << std::endl;
+            std::cout << "buy index (row,col) = (" << Operations[j].symbolRow << ", " << Operations[j].symbolCol << ")" << std::endl;
         }
-        bool activation[n][n] = {0};
-        for (int c = 0; c < N; c++)
-        {
-            if (Operations[c].timestamp == (unsigned int)(-1))
-                break;
-            //uint64_t t = Operations[c].timestamp;
-            activation[Operations[c].symbolRow][Operations[c].symbolCol] = true;
-        }
+        std::cout << std::endl;
 
-        print_activation(activation);
-        print_objectives(xrate, activation);
+//        bool activation[n][n] = {0};
+//        for (int c = 0; c < N; c++)
+//        {
+//            if (Operations[c].timestamp == (unsigned int)(-1))
+//                break;
+//            //uint64_t t = Operations[c].timestamp;
+//            activation[Operations[c].symbolRow][Operations[c].symbolCol] = true;
+//        }
+//
+//        print_activation(activation);
+//        print_objectives(xrate, activation);
     }
 
     //Verify the result
@@ -333,7 +345,6 @@ int main(int argc, char *argv[])
     //         break;
     //     }
     // }
-
     // q.enqueueUnmapMemObject(buffer_a, ptr_a);
     // q.enqueueUnmapMemObject(buffer_b, ptr_b);
     // q.enqueueUnmapMemObject(buffer_result, ptr_result);

@@ -1,7 +1,18 @@
-#ifndef __GLOBAL_H__
-#define __GLOBAL_H__
+#ifndef GLOBAL_H
+#define GLOBAL_H
 
-// ==================== constants for sbm ====================
+const int n = 3;
+const int N = n * n; // number of variables
+const int n_seq = N;  // number of xrate updates
+const int max_op = N; // output buffer size for storing operations
+                      // problem size
+
+const int N_step = 100; // number of steps
+const int M = 2;        // number of substeps in a step
+
+// degree of parallelism
+const int Pb = 1;      // number of blocks
+const int Nb = N / Pb; // the number of spins to be handled in a block
 
 /*
 These parameters are set according to p.6 of [2].
@@ -11,27 +22,10 @@ QUBO2Ising_3 is based on the objective function in [3].
 [2] FPGA-based Simulated Bifurcation Machine
 [3] A Currency Arbitrage Machine based on the Simulated Bifurcation Algorithm for Ultrafast Detection of Optimal Opportunity
 */
-
-// problem size
-const int N = 9;        // number of variables
-const int N_step = 100; // number of steps
-const int M = 2;        // number of substeps in a step
-
-// degree of parallelism
-const int Pb = 1;       // number of blocks
-const int Nb = N / Pb;  // the number of spins to be handled in a block
-
-// constants
-const float alpha0 = 1.;    // Delta in [1]
-const float beta0 = 1.;     // K in [1]
+const float alpha0 = 1.; // Delta in [1]
+const float beta0 = 1.;  // K in [1]
 const float Delta_t = 0.7;
 const float delta_t = Delta_t / M;
-
-// ==================== constants for exch and sbm_tb_k2000 ====================
-
-// constants for interface
-const int n = 3;        // number of currencies
-const int max_op = N;   // output buffer size for storing operations
 
 // constants in objective function
 const float M1 = 0.2;

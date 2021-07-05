@@ -26,7 +26,7 @@ extern "C"
         inline float FX(float x_sub_i, float h_sub_i);
         inline float FP(float p_sub_i);
     };
-    void bottom(float J[N][N], float h[N], float x_init[N], float p_init[N], bool spin[N]);
+    void top(float J[N][N], float h[N], float x_init[N], float p_init[N], bool spin[N]);
     float sd(float J[N][N]);
     void SBM(float J[N][N], float h[N], MMTE blocks[Pb], bool spin[N]);
 }
