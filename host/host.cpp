@@ -165,11 +165,12 @@ int main(int argc, char *argv[])
 
     char *xclbinFilename = argv[1];
 
+
     // Compute the size of array in bytes
     //size_t size_in_bytes = DATA_SIZE * sizeof(int);
 
     //size_t xrate_size_bytes = n * n * sizeof(float);
-    size_t xpinit_size_bytes = n * sizeof(float);
+    size_t xpinit_size_bytes = N * sizeof(float);
     //size_t activatetion_size_bytes = n * n * sizeof(bool);
     size_t orderEntryOperation_t_size_bytes = N * sizeof(orderEntryOperation_t);
 
@@ -238,23 +239,25 @@ int main(int argc, char *argv[])
         {-0.042122476, -0.1619456788, 0},
     };
     //orderEntryOperation_t Operations[n];
-    std::vector<orderEntryOperation_t, aligned_allocator<orderEntryOperation_t>> Operations(n);
+    std::vector<orderEntryOperation_t, aligned_allocator<orderEntryOperation_t>> Operations(N);
     std::vector<float, aligned_allocator<float>> x_init(N);
     std::vector<float, aligned_allocator<float>> p_init(N);
-    orderBookResponse_t *current_order = (orderBookResponse_t*)(new char[4096]);
+    void* tmp_mem;
+    posix_memalign(&tmp_mem, 4096, sizeof(orderBookResponse_t));
+    orderBookResponse_t *current_order = (orderBookResponse_t* )tmp_mem;
     //float x_init[N] = {0};
     //float p_init[N] = {0};
 
     // These commands will allocate memory on the Device. The cl::Buffer objects can
     // be used to reference the memory locations on the device.
     //cl::Buffer buffer_xrate(context, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR, xrate_size_bytes, xrate);
-    cl::Buffer buffer_order(context, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR, sizeof(char)*4096 /*4k aligned*/, current_order);
+    cl::Buffer buffer_order(context, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR, sizeof(orderBookResponse_t) /*4k aligned*/, current_order);
     cl::Buffer buffer_xinit(context, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR, xpinit_size_bytes, x_init.data());
     cl::Buffer buffer_pinit(context, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR, xpinit_size_bytes, p_init.data());
     cl::Buffer buffer_orderEntryOperation(context, CL_MEM_WRITE_ONLY | CL_MEM_USE_HOST_PTR, orderEntryOperation_t_size_bytes, Operations.data());
     cl::Buffer buffer_J(context, CL_MEM_READ_WRITE | CL_MEM_HOST_NO_ACCESS, N*N*sizeof(float ), nullptr);
     cl::Buffer buffer_h(context, CL_MEM_READ_WRITE | CL_MEM_HOST_NO_ACCESS, N*sizeof(float ), nullptr);
-    cl::Buffer buffer_spin(context, CL_MEM_READ_WRITE | CL_MEM_HOST_NO_ACCESS, N*N*sizeof(bool ), nullptr);
+    cl::Buffer buffer_spin(context, CL_MEM_READ_WRITE | CL_MEM_HOST_NO_ACCESS, N*sizeof(bool ), nullptr);
 
     //set the kernel Arguments
     krnl_exch_in.setArg(0,buffer_order);
@@ -267,7 +270,6 @@ int main(int argc, char *argv[])
     krnl_sbm.setArg(4, buffer_spin);
     krnl_exch_out.setArg(0,buffer_spin);
     krnl_exch_out.setArg(1,buffer_orderEntryOperation);
-
     // //We then need to map our OpenCL buffers to get the pointers
     // float **ptr_xrate = (float **)q.enqueueMapBuffer(buffer_xrate, CL_TRUE, CL_MAP_WRITE, 0, xrate_size_bytes);
     // float *ptr_xinit = (float *)q.enqueueMapBuffer(buffer_xinit, CL_TRUE, CL_MAP_WRITE, 0, xpinit_size_bytes);
@@ -294,16 +296,24 @@ int main(int argc, char *argv[])
 
         // Data will be migrated to kernel space
         //q.enqueueMigrateMemObjects({buffer_xinit, buffer_pinit, buffer_order}, 0 /* 0 means from host*/);
-        q.enqueueMigrateMemObjects({buffer_xinit, buffer_pinit,buffer_order}, 0 /* 0 means from host*/);
+        cl::Event e[4];
+        std::vector< cl::Event > waitlist;
+        q.enqueueMigrateMemObjects({buffer_xinit, buffer_pinit,buffer_order}, 0 /* 0 means from host*/,nullptr,&e[0]);
         //Launch the Kernel
-        q.enqueueTask(krnl_exch_in);
-        q.enqueueTask(krnl_sbm);
-        q.enqueueTask(krnl_exch_out);
-
+        waitlist.push_back(e[0]);
+        q.enqueueTask(krnl_exch_in,&waitlist,&e[1]);
+        waitlist.clear();
+        waitlist.push_back(e[1]);
+        q.enqueueTask(krnl_sbm,&waitlist,&e[2]);
+        waitlist.clear();
+        waitlist.push_back(e[2]);
+        q.enqueueTask(krnl_exch_out,&waitlist,&e[3]);
         // The result of the previous kernel execution will need to be retrieved in
         // order to view the results. This call will transfer the data from FPGA to
         // source_results vector
-        q.enqueueMigrateMemObjects({buffer_orderEntryOperation}, CL_MIGRATE_MEM_OBJECT_HOST);
+        waitlist.clear();
+        waitlist.push_back(e[3]);
+        q.enqueueMigrateMemObjects({buffer_orderEntryOperation}, CL_MIGRATE_MEM_OBJECT_HOST,&waitlist);
         q.finish();
         brute_force(xrate);
         for (int j = 0; j < N; j++)
